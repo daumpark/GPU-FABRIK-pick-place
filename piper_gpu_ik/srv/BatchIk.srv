@@ -1,0 +1,15 @@
+geometry_msgs/Pose target
+int32 num_seeds
+bool include_q0
+float32 tol_pos
+float32 tol_ang_deg
+bool use_cuda
+float32 w_pos
+float32 w_ori
+float32 tool_len
+---
+bool success
+float32[] solution
+float32 err_pos
+float32 err_ang
+string message

@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>piper_gpu_ik</name>
+  <version>0.0.1</version>
+  <description>GPU 병렬 FABRIK IK 서버 및 pick/place 코디네이터</description>
+
+  <maintainer email="user@example.com">auto_generated</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>gazebo_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-torch</exec_depend>
+  <exec_depend>urdf_parser_py</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

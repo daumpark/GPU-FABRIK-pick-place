@@ -17,6 +17,17 @@ from piper_gpu_ik_py.gpu_fabrik_core import (
     get_default_link_names,
 )
 
+# World에 배치된 기본 큐브들(타겟이 아닌 경우 장애물로 취급)
+DEFAULT_CUBE_OBSTACLES = [
+    'cube_b',
+    'cube_bg',
+    'cube_or',
+    'cube_r',
+    'cube_rv',
+    'cube_vb',
+    'cube_yo',
+]
+
 # Robot spawn position from launch file
 ROBOT_BASE_X = 11.4
 ROBOT_BASE_Y = -12.2
@@ -119,7 +130,7 @@ class PickAndPlace(Node):
         self.get_logger().info(f"Found {name} at World: ({wx:.3f}, {wy:.3f}, {wz:.3f}) -> Robot: ({rx:.3f}, {ry:.3f}, {rz:.3f})")
         return (rx, ry, rz)
 
-    def get_ik(self, x, y, z, roll, pitch, yaw, tool_len=0.13, w_ori=0.5, tol_ang_deg=5.0):
+    def get_ik(self, x, y, z, roll, pitch, yaw, tool_len=0.13, w_ori=0.5, tol_ang_deg=5.0, obstacles=None):
         req = BatchIk.Request()
         req.target.position.x = float(x)
         req.target.position.y = float(y)
@@ -148,18 +159,24 @@ class PickAndPlace(Node):
         req.w_ori = float(w_ori) 
         req.tool_len = float(tool_len)
 
+        obs_list = self.obstacles if obstacles is None else obstacles
+        if obs_list:
+            for R, p, h in obs_list:
+                pose = Pose()
+                pose.position.x = float(p[0])
+                pose.position.y = float(p[1])
+                pose.position.z = float(p[2])
+                pose.orientation.w = 1.0  # obstacles are treated as axis-aligned boxes
+                req.obstacles.append(pose)
+                req.obstacles_half_x.append(float(h[0]))
+                req.obstacles_half_y.append(float(h[1]))
+                req.obstacles_half_z.append(float(h[2]))
+
         future = self.ik_client.call_async(req)
         rclpy.spin_until_future_complete(self, future)
         return future.result()
 
     def send_arm_traj(self, joints, duration=2.0):
-        # Path collision check (linear in joint space)
-        if self.last_arm_q is not None and len(self.obstacles) > 0:
-            ok = self._check_path_collision(self.last_arm_q, joints)
-            if not ok:
-                self.get_logger().error('Path collision predicted; skipping arm command')
-                return False
-
         msg = JointTrajectory()
         msg.joint_names = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
         pt = JointTrajectoryPoint()
@@ -252,8 +269,13 @@ def main():
 
         # Obstacles: other cubes (excluding the target cube)
         obs_names = [n.strip() for n in args.obstacles.split(',') if n.strip()]
-        # Add fixed props to avoid during motion
+        # 타겟이 아닌 큐브들은 기본적으로 모두 장애물로 추가
+        obs_names.extend([nm for nm in DEFAULT_CUBE_OBSTACLES if nm != args.cube])
+        # 고정 구조물도 장애물로 추가
         obs_names.extend(['OpenRobotics/AdjTable', '100mmbin', 'unit_box'])
+        # 중복 제거
+        seen = set()
+        obs_names = [nm for nm in obs_names if not (nm in seen or seen.add(nm))]
         obstacles = []
         for nm in obs_names:
             if nm == args.cube:

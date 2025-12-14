@@ -7,6 +7,10 @@ bool use_cuda
 float32 w_pos
 float32 w_ori
 float32 tool_len
+geometry_msgs/Pose[] obstacles
+float32[] obstacles_half_x
+float32[] obstacles_half_y
+float32[] obstacles_half_z
 ---
 bool success
 float32[] solution

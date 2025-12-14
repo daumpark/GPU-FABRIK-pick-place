@@ -25,10 +25,6 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 install(
-  PROGRAMS scripts/joint8_ctrl.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-install(
   PROGRAMS scripts/pick_and_place.py
   DESTINATION lib/${PROJECT_NAME}
 )

@@ -594,7 +594,10 @@ def run_parallel_seeds(
         for obs in obstacles:
             if obs is None:
                 continue
-            T_obs = obs.get("T") or obs.get("pose")
+            T_obs = obs.get("T", None)
+            if T_obs is None:
+                T_obs = obs.get("pose", None)
+
             half = obs.get("half_extent", None)
             if half is None:
                 half = obs.get("half_extents", None)

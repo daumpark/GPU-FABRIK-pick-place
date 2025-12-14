@@ -81,6 +81,17 @@ class GpuFabrikServer(Node):
         q0_to_use = self.q0
         include_q0_flag = self.q0 is not None
 
+        obstacles = []
+        if request.obstacles:
+            hx, hy, hz = request.obstacles_half_x, request.obstacles_half_y, request.obstacles_half_z
+            n = min(len(request.obstacles), len(hx), len(hy), len(hz))
+            if n < len(request.obstacles):
+                self.get_logger().warn('Obstacle half-extent arrays shorter than poses; truncating obstacle list.')
+            for i in range(n):
+                T_obs = pose_to_matrix(request.obstacles[i])
+                half = np.array([hx[i], hy[i], hz[i]], dtype=float)
+                obstacles.append({"T": T_obs, "half_extent": half})
+
         try:
             results, info = run_parallel_seeds(
                 urdf_path=self.urdf_path,
@@ -93,6 +104,7 @@ class GpuFabrikServer(Node):
                 tool_len=request.tool_len,
                 w_pos=w_pos,
                 w_ori=w_ori,
+                obstacles=obstacles,
                 tol_pos_n1=tol_pos,
                 tol_ang_n1_deg=tol_ang_deg,
                 device=device,

@@ -89,6 +89,7 @@ class GpuFabrikServer(Node):
                 num_seeds=num_seeds,
                 include_q0=include_q0_flag,
                 q0=q0_to_use,
+                q_current=q0_to_use,
                 tool_len=request.tool_len,
                 w_pos=w_pos,
                 w_ori=w_ori,

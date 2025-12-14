@@ -538,11 +538,13 @@ def run_parallel_seeds(
     num_seeds: int = 1024,
     include_q0: bool = True,
     q0: Optional[np.ndarray] = None,
+    q_current: Optional[np.ndarray] = None,
     tool_len: float = 0.0,
     w_pos: float = 1.0,
     w_ori: float = 1.0,
-    w_w: float = 0.0001,
-    w_coll: float = 1.0,
+    w_center: float = 0.005,
+    w_dq: float = 0.1,
+    w_coll: float = 5.0,
     tol_pos_n1: float = 1e-2,
     tol_ang_n1_deg: float = 5.0,
     device=None,
@@ -689,7 +691,16 @@ def run_parallel_seeds(
     qn_t = torch.from_numpy(seeds_exp[:, N - 1]).to(device=device, dtype=dtype).unsqueeze(1)
     q_full_t = torch.cat([q_sol_sub, qn_t], dim=1)
 
-    cost = cost_function(q_full_t, kin_full)
+    if q_current is not None:
+        q_current_np = np.asarray(q_current, float).reshape(-1)
+        if q_current_np.shape[0] != N:
+            raise ValueError(f"q_current length {q_current_np.shape[0]} != num joints {N}")
+        q_ref_np = np.repeat(q_current_np[None, :], B, axis=0)
+    else:
+        q_ref_np = seeds_exp
+
+    q_ref_t = torch.from_numpy(q_ref_np).to(device=device, dtype=dtype)
+    cost_center, cost_dq = cost_function(q_full_t, kin_full, q_ref=q_ref_t)
 
     Ts = kin_full.fk_Ts(q_full_t)
     R_cur = Ts[-1][:, :3, :3]
@@ -710,7 +721,13 @@ def run_parallel_seeds(
 
     coll_pen = collision_penalty(P_cur_pts, obstacles_t, coll_clearance) if obstacles_t else torch.zeros_like(pos_err)
 
-    score = w_pos * pos_err + w_ori * ang_err + w_coll * coll_pen + cost
+    score = (
+        (w_pos * pos_err)
+        + (w_ori * ang_err)
+        + (w_coll * coll_pen)
+        + (w_center * cost_center)
+        + (w_dq * cost_dq)
+    )
 
     # ------------------------------------------------------------
     # Collect & sort results (UNCHANGED semantics)
@@ -763,32 +780,32 @@ def get_default_link_names() -> List[str]:
     # URDF link names
     return ["base_link", "link1", "link2", "link3", "link4", "link5", "link6"]
 
-def cost_function(q_full_t, kin : URDFKinematicsTorch):
-    w_center = 0.01
-    # 1. Joint Centering (관절이 범위 중앙에 있을수록 좋음)
-    
-    # 중앙값 계산: (Min + Max) / 2
+def cost_function(
+    q_full_t: torch.Tensor,
+    kin: URDFKinematicsTorch,
+    *,
+    q_ref: Optional[torch.Tensor] = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Return unweighted joint costs:
+    - cost_center: deviation from joint mid-ranges
+    - cost_dq: change relative to reference configuration
+    """
     limits_mid = (kin.lower + kin.upper) / 2.0  # (N,)
-    
-    # 범위 계산: Max - Min
-    limits_range = (kin.upper - kin.lower)      # (N,)
-    
-    # 0으로 나누기 방지 (무한대 리미트가 있거나 범위가 0인 경우 대비)
-    limits_range = torch.clamp(limits_range, min=1e-6)
+    limits_range = torch.clamp(kin.upper - kin.lower, min=1e-6)  # (N,)
+    range_half = limits_range * 0.5
 
-    # 정규화된 거리 제곱 계산: ((q - mid) / (range/2))^2
-    # 결과가 0이면 정중앙, 1이면 한계점(Limit)에 도달했음을 의미
-    dist_from_mid = (q_full_t - limits_mid) / (limits_range * 0.5) 
-    
-    # 모든 관절의 이탈 정도를 합산 -> (B,)
-    cost_center = torch.sum(dist_from_mid ** 2, dim=-1) 
+    dist_from_mid = (q_full_t - limits_mid) / range_half
+    cost_center = torch.sum(dist_from_mid ** 2, dim=-1)  # (B,)
 
-    # 최종 비용
-    total_cost = w_center * cost_center
+    if q_ref is not None:
+        q_ref = q_ref.to(device=q_full_t.device, dtype=q_full_t.dtype)
+        dist_from_ref = (q_full_t - q_ref) / range_half
+        cost_dq = torch.sum(dist_from_ref ** 2, dim=-1)  # (B,)
+    else:
+        cost_dq = torch.zeros_like(cost_center)
 
-    # print(f"Joint Centering Cost: {total_cost}")
-    
-    return total_cost
+    return cost_center, cost_dq
 
 
 def collision_penalty(

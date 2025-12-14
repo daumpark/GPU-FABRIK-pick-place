@@ -37,11 +37,9 @@ ros2 run <package_name> mpc_controller --ros-args -p horizon:=30
 ## Examples
 1. **MPC Tracking** – Humanoid walking in Gazebo  
    ```bash
-   ros2 launch mpc_humanoid walking.launch.py
-   ```
-2. **Impedance Control** – 7-DoF Arm tracking trajectory  
-   ```bash
-   ros2 launch impedance_control demo.launch.py
+   ros2 launch piper_gazebo piper_gazebo.launch.py
+   ros2 run piper_gpu_ik gpu_fabrik_server
+   ros2 run piper_gazebo pick_and_place.py --cube <cube_name>
    ```
 
 ## Citation

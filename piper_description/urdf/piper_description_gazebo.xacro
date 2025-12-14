@@ -399,7 +399,7 @@
         ixx="0.00007371"
         ixy="-0.00000113"
         ixz="0.00000021"
-        iyy="-0.00000113"
+        iyy="0.00007371"
         iyz="-0.00001372"
         izz="0.0000747" />
     </inertial>
@@ -458,7 +458,7 @@
         ixx="0.00007371"
         ixy="-0.00000113"
         ixz="0.00000021"
-        iyy="-0.00000113"
+        iyy="0.00007371"
         iyz="-0.00001372"
         izz="0.0000747" />
     </inertial>
@@ -543,8 +543,11 @@
       </hardware>
       <joint name="joint1">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">-2.618</param>
+              <param name="max">2.618</param>
+              <param name="p">1000.0</param>
+              <param name="i">0.0</param>
+              <param name="d">10.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -553,8 +556,11 @@
       </joint>
       <joint name="joint2">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">0</param>
+              <param name="max">3.14</param>
+              <param name="p">1000.0</param>
+              <param name="i">0.0</param>
+              <param name="d">10.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -563,8 +569,11 @@
       </joint>
       <joint name="joint3">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">-2.967</param>
+              <param name="max">0</param>
+              <param name="p">1000.0</param>
+              <param name="i">0.0</param>
+              <param name="d">10.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -573,8 +582,11 @@
       </joint>
       <joint name="joint4">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">-1.745</param>
+              <param name="max">1.745</param>
+              <param name="p">1000.0</param>
+              <param name="i">0.0</param>
+              <param name="d">10.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -583,8 +595,11 @@
       </joint>
       <joint name="joint5">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">-1.22</param>
+              <param name="max">1.22</param>
+              <param name="p">1000.0</param>
+              <param name="i">0.0</param>
+              <param name="d">10.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -593,8 +608,11 @@
       </joint>
       <joint name="joint6">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">-2.0944</param>
+              <param name="max">2.0944</param>
+              <param name="p">1000.0</param>
+              <param name="i">0.0</param>
+              <param name="d">10.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -603,8 +621,11 @@
       </joint>
       <joint name="joint7">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">0</param>
+              <param name="max">0.035</param>
+              <param name="p">100.0</param>
+              <param name="i">0.0</param>
+              <param name="d">1.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>
@@ -613,8 +634,11 @@
       </joint>
       <joint name="joint8">
           <command_interface name="position">
-              <param name="min">-1</param>
-              <param name="max">1</param>
+              <param name="min">-0.035</param>
+              <param name="max">0</param>
+              <param name="p">100.0</param>
+              <param name="i">0.0</param>
+              <param name="d">1.0</param>
           </command_interface>
           <state_interface name="position">
               <param name="initial_value">0.0</param>

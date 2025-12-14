@@ -6,6 +6,7 @@ import torch
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
+from sensor_msgs.msg import JointState
 
 from piper_gpu_ik.srv import BatchIk
 from piper_gpu_ik_py.gpu_fabrik_core import build_default_robot_urdf_path, get_default_link_names, run_parallel_seeds
@@ -36,6 +37,7 @@ class GpuFabrikServer(Node):
         super().__init__('gpu_fabrik_server')
         self.urdf_path = build_default_robot_urdf_path()
         self.link_names = get_default_link_names()
+        self.joint_names = [f'joint{i}' for i in range(1, 7)]
         self.q0 = None
 
         self.declare_parameter('default_num_seeds', 256)
@@ -45,8 +47,24 @@ class GpuFabrikServer(Node):
         self.declare_parameter('default_w_ori', 0.05)
         self.declare_parameter('use_cuda', True)
 
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_state_callback,
+            10
+        )
+
         self.srv = self.create_service(BatchIk, 'batch_ik', self.handle_request)
         self.get_logger().info('gpu_fabrik_server ready (service: /batch_ik)')
+
+    def joint_state_callback(self, msg: JointState):
+        try:
+            name_to_idx = {name: i for i, name in enumerate(msg.name)}
+            indices = [name_to_idx[name] for name in self.joint_names]
+            self.q0 = np.array([msg.position[i] for i in indices])
+        except (KeyError, IndexError):
+            self.get_logger().warn('Could not find all joint names in joint_states message. Seeding with current state will be disabled.', throttle_duration_sec=5.0)
+            self.q0 = None
 
     def handle_request(self, request: BatchIk.Request, response: BatchIk.Response):
         num_seeds = request.num_seeds if request.num_seeds > 0 else int(self.get_parameter('default_num_seeds').value)
@@ -60,14 +78,17 @@ class GpuFabrikServer(Node):
 
         T_goal = pose_to_matrix(request.target)
 
+        q0_to_use = self.q0
+        include_q0_flag = self.q0 is not None
+
         try:
             results, info = run_parallel_seeds(
                 urdf_path=self.urdf_path,
                 link_names=self.link_names,
                 T_ee_target=T_goal,
                 num_seeds=num_seeds,
-                include_q0=bool(request.include_q0),
-                q0=self.q0,
+                include_q0=include_q0_flag,
+                q0=q0_to_use,
                 tool_len=request.tool_len,
                 w_pos=w_pos,
                 w_ori=w_ori,
@@ -94,14 +115,40 @@ class GpuFabrikServer(Node):
             response.message = 'no solutions from solver'
             return response
 
+        ok_count = sum(1 for r in results if r.get('ok', False))
+        self.get_logger().info(f"Batch IK results: ok={ok_count}/{len(results)}")
+
+        if ok_count == 0:
+            # No solution satisfies tolerance: do not execute motion.
+            best = results[0]
+            response.success = False
+            response.solution = []
+            response.err_pos = float(best['err_pos'])
+            response.err_ang = float(best['err_ang_rad'])
+            response.message = (
+                f"no tol-satisfying solution; best score pos_err={best['err_pos']:.4f} "
+                f"ang_err={math.degrees(best['err_ang_rad']):.2f}deg"
+            )
+            return response
+
+        # Prefer the best-scoring solution that satisfies tolerance (ok=True).
+        # If none satisfy tol, fall back to the best overall (score order already sorted).
         best = results[0]
+        selected_idx = 0
+        for i, r in enumerate(results):
+            if r.get('ok', False):
+                best = r
+                selected_idx = i
+                break
+
         response.success = bool(best['ok'])
         response.solution = [float(x) for x in best['q_full']]
         response.err_pos = float(best['err_pos'])
         response.err_ang = float(best['err_ang_rad'])
         response.message = (
             f"batch={info.get('batch')} dev={info.get('device')} "
-            f"pos_err={best['err_pos']:.4f} ang_err={math.degrees(best['err_ang_rad']):.2f}deg"
+            f"pos_err={best['err_pos']:.4f} ang_err={math.degrees(best['err_ang_rad']):.2f}deg "
+            f"ok_tol={bool(best['ok'])} idx={selected_idx} ok_count={ok_count}"
         )
         return response
 

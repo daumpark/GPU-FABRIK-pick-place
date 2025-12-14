@@ -1,6 +1,6 @@
 import math
 import time
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 import os
 
 import numpy as np
@@ -541,78 +541,132 @@ def run_parallel_seeds(
     tool_len: float = 0.0,
     w_pos: float = 1.0,
     w_ori: float = 1.0,
+    w_w: float = 0.0001,
+    w_coll: float = 1.0,
     tol_pos_n1: float = 1e-2,
     tol_ang_n1_deg: float = 5.0,
     device=None,
     dtype=torch.float64,
     *,
+    obstacles: Optional[List[Any]] = None,
+    coll_clearance: float = 0.02,
     do_warmup: bool = True,
     warmup_rounds: int = 1,
 ):
     device = device or (torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))
-    
-    # Initialize URDF Kinematics
+
+    # ------------------------------------------------------------
+    # Kinematics
+    # ------------------------------------------------------------
     kin_full = URDFKinematicsTorch(urdf_path, link_names, device=device, dtype=dtype)
     N = kin_full.N
-    
+
     link_names_sub = link_names[:-1]
     kin_sub = URDFKinematicsTorch(urdf_path, link_names_sub, device=device, dtype=dtype)
-    
+
+    # ------------------------------------------------------------
+    # Seed generation (UNCHANGED)
+    # ------------------------------------------------------------
     rng = np.random.default_rng()
     seeds = []
     if include_q0 and (q0 is not None):
         seeds.append(np.asarray(q0, float))
-        
-    joint_limits_np = kin_full.limits
-    joint_limits_np = np.array(joint_limits_np, float)
-    
+
+    joint_limits_np = np.asarray(kin_full.limits, float)
     lo, hi = joint_limits_np[:, 0], joint_limits_np[:, 1]
-    if num_seeds > (1 if include_q0 and (q0 is not None) else 0):
+
+    if num_seeds > len(seeds):
         u = rng.random((num_seeds - len(seeds), N))
         seeds_rand = lo + u * (hi - lo)
         seeds.extend(seeds_rand)
-    seeds = np.asarray(seeds, float)
-    B = seeds.shape[0]
 
-    Tn_target = wrist_target_from_ee_target_np(T_ee_target, tool_len)
-    
-    T_f_N = kin_full.fixed_transforms_stack[-1].cpu().numpy() # Last joint fixed transform
+    seeds = np.asarray(seeds, float)  # (S, N)
+    S = seeds.shape[0]
+
+    # ------------------------------------------------------------
+    # Obstacles (convert to tensors for collision penalty)
+    # Each obstacle: dict with keys {"T": 4x4, "half_extent" or "half_extents" or "half"}
+    # ------------------------------------------------------------
+    obstacles_t = []
+    if obstacles:
+        for obs in obstacles:
+            if obs is None:
+                continue
+            T_obs = obs.get("T") or obs.get("pose")
+            half = obs.get("half_extent", None)
+            if half is None:
+                half = obs.get("half_extents", None)
+            if half is None:
+                half = obs.get("half", None)
+            if T_obs is None or half is None:
+                continue
+            T_obs = np.asarray(T_obs, float)
+            R = torch.from_numpy(T_obs[:3, :3]).to(device=device, dtype=dtype)
+            p = torch.from_numpy(T_obs[:3, 3]).to(device=device, dtype=dtype)
+            half_np = np.asarray(half, float)
+            if half_np.ndim == 0:
+                half_np = np.full((3,), float(half_np))
+            half_t = torch.from_numpy(half_np).to(device=device, dtype=dtype)
+            obstacles_t.append((R, p, half_t))
+
+    # ------------------------------------------------------------
+    # NEW: pitch sweep target expansion
+    # ------------------------------------------------------------
+    T_ee_targets, pitch_vals = expand_target_by_pitch(
+        T_ee_target,
+        pitch_min=1.57,
+        pitch_max=3.14,
+        num_pitch=10,
+        return_pitches=True,
+    )  # (T, 4, 4)
+
+    T = T_ee_targets.shape[0]
+
+    # Cartesian product: target × seed
+    T_ee_targets_exp = np.repeat(T_ee_targets, S, axis=0)   # (T*S, 4, 4)
+    seeds_exp = np.tile(seeds, (T, 1))                       # (T*S, N)
+
+    B = seeds_exp.shape[0]
+    target_ids = np.repeat(np.arange(T), S)
+    target_labels_arr = np.array([f"pitch[{i}]={float(p):.3f}" for i, p in enumerate(pitch_vals)])
+
+    # ------------------------------------------------------------
+    # Wrist target for sub-chain (UNCHANGED logic, batched)
+    # ------------------------------------------------------------
+    T_f_N = kin_full.fixed_transforms_stack[-1].cpu().numpy()
     axis_N = kin_full.joint_axes_stack[-1].cpu().numpy()
-    
+
     Tn1_targets = []
     for b in range(B):
-        qn = float(seeds[b, N - 1])
-        
-        # Calculate T_rot_N(qn) numpy
+        qn = float(seeds_exp[b, N - 1])
+
         kx, ky, kz = axis_N
         ct, st = math.cos(qn), math.sin(qn)
         R_rot = np.array([
-            [ct + kx**2*(1-ct),    kx*ky*(1-ct) - kz*st, kx*kz*(1-ct) + ky*st],
-            [ky*kx*(1-ct) + kz*st, ct + ky**2*(1-ct),    ky*kz*(1-ct) - kx*st],
-            [kz*kx*(1-ct) - ky*st, kz*ky*(1-ct) + kx*st, ct + kz**2*(1-ct)]
+            [ct + kx*kx*(1-ct),     kx*ky*(1-ct) - kz*st, kx*kz*(1-ct) + ky*st],
+            [ky*kx*(1-ct) + kz*st,  ct + ky*ky*(1-ct),    ky*kz*(1-ct) - kx*st],
+            [kz*kx*(1-ct) - ky*st,  kz*ky*(1-ct) + kx*st, ct + kz*kz*(1-ct)],
         ])
-        # T_LinkN = T_Link(N-1) @ T_fixed @ T_rot
-        # Tn1 = Tn_target @ inv(T_fixed @ T_rot)
-        
-        T_inv = np.linalg.inv(T_f_N @ np.eye(4)) # Wait, T_rot should be part of it.
-        # Actually T_Link(N-1) is frame BEFORE joint N rotation and BEFORE fixed transform of Joint N.
-        # Joint N connects Link N-1 -> Link N.
-        # T_LinkN = T_Link(N-1) * T_fixed_N * T_rot_N
-        
-        T_rot_mat = np.eye(4)
-        T_rot_mat[:3, :3] = R_rot
-        
-        T_inv = np.linalg.inv(T_f_N @ T_rot_mat)
-        Tn1 = Tn_target @ T_inv
-        Tn1_targets.append(Tn1)
-        
-    Tn1_targets_t = torch.from_numpy(np.stack(Tn1_targets, 0)).to(device=device, dtype=dtype)
 
+        T_rot = np.eye(4)
+        T_rot[:3, :3] = R_rot
+
+        T_inv = np.linalg.inv(T_f_N @ T_rot)
+        Tn1 = wrist_target_from_ee_target_np(T_ee_targets_exp[b], tool_len) @ T_inv
+        Tn1_targets.append(Tn1)
+
+    Tn1_targets_t = torch.from_numpy(
+        np.stack(Tn1_targets, axis=0)
+    ).to(device=device, dtype=dtype)
+
+    # ------------------------------------------------------------
+    # FABRIK solve (UNCHANGED)
+    # ------------------------------------------------------------
     solver = PoseFABRIKBatch(kin_sub)
     solver.tol_pos = float(tol_pos_n1)
     solver.tol_ori = math.radians(float(tol_ang_n1_deg))
 
-    q0_sub = seeds[:, : N - 1]
+    q0_sub = seeds_exp[:, : N - 1]
     q0_sub_t = torch.from_numpy(q0_sub).to(device=device, dtype=dtype)
 
     if do_warmup:
@@ -620,58 +674,81 @@ def run_parallel_seeds(
 
     if device.type == "cuda":
         torch.cuda.synchronize()
+
     start = time.perf_counter()
     q_sol_sub, success, info = solver.solve_batch(Tn1_targets_t, q0_sub_t)
+
     if device.type == "cuda":
         torch.cuda.synchronize()
+
     elapsed = (time.perf_counter() - start) * 1000.0
 
-    qn_t = torch.from_numpy(seeds[:, N - 1]).to(device=device, dtype=dtype).unsqueeze(1)
+    # ------------------------------------------------------------
+    # Reconstruct full q and score (UNCHANGED, but batched)
+    # ------------------------------------------------------------
+    qn_t = torch.from_numpy(seeds_exp[:, N - 1]).to(device=device, dtype=dtype).unsqueeze(1)
     q_full_t = torch.cat([q_sol_sub, qn_t], dim=1)
+
+    cost = cost_function(q_full_t, kin_full)
 
     Ts = kin_full.fk_Ts(q_full_t)
     R_cur = Ts[-1][:, :3, :3]
     p_cur = Ts[-1][:, :3, 3]
-    R_tgt = torch.from_numpy(T_ee_target[:3, :3]).to(device=device, dtype=dtype).unsqueeze(0).expand(B, 3, 3).contiguous()
-    p_tgt = torch.from_numpy(T_ee_target[:3, 3]).to(device=device, dtype=dtype).unsqueeze(0).expand(B, 3).contiguous()
+
+    P_cur_pts, _ = kin_full.fk_points_axes(q_full_t)
+
+    R_tgt = torch.from_numpy(T_ee_targets_exp[:, :3, :3]).to(
+        device=device, dtype=dtype
+    )
+    p_tgt = torch.from_numpy(T_ee_targets_exp[:, :3, 3]).to(
+        device=device, dtype=dtype
+    )
 
     pos_err = torch.linalg.norm(p_cur - p_tgt, dim=-1)
     Re = R_tgt @ R_cur.transpose(1, 2)
     ang_err = torch.linalg.norm(so3_log(Re), dim=-1)
-    score = w_pos * pos_err + w_ori * ang_err
 
-    time_ms_arr = np.asarray(info.get("solve_time_ms_per_seed", np.full((B,), np.nan, float)), float)
-    outer_it_arr = np.asarray(info.get("outer_iters_to_solve", np.full((B,), -1, int)), int)
+    coll_pen = collision_penalty(P_cur_pts, obstacles_t, coll_clearance) if obstacles_t else torch.zeros_like(pos_err)
 
+    score = w_pos * pos_err + w_ori * ang_err + w_coll * coll_pen + cost
+
+    # ------------------------------------------------------------
+    # Collect & sort results (UNCHANGED semantics)
+    # ------------------------------------------------------------
     pos_err_np = pos_err.detach().cpu().numpy()
     ang_err_np = ang_err.detach().cpu().numpy()
+    coll_pen_np = coll_pen.detach().cpu().numpy()
     score_np = score.detach().cpu().numpy()
     q_full_np = q_full_t.detach().cpu().numpy()
     success_np = success.detach().cpu().numpy().astype(bool)
 
     order = np.argsort(score_np)
+
     results = []
     for i in order:
+        t_idx = int(target_ids[i])
         results.append(
             dict(
                 q_full=q_full_np[i].copy(),
                 ok=bool(success_np[i]),
                 err_pos=float(pos_err_np[i]),
                 err_ang_rad=float(ang_err_np[i]),
+                coll_penalty=float(coll_pen_np[i]),
                 score=float(score_np[i]),
-                solve_time_ms=float(time_ms_arr[i]),
-                outer_iters_to_solve=int(outer_it_arr[i]),
+                target_idx=t_idx,
+                target_label=str(target_labels_arr[t_idx]),
             )
         )
 
     out_info = dict(
-        mean_subchain_pos_err=float(info.get("mean_pos_err", 0.0)),
-        mean_subchain_ori_err=float(info.get("mean_ori_err", 0.0)),
         batch=B,
         device=str(device),
         measured_batch_ms=float(elapsed),
     )
+
     return results, out_info
+
+
 
 def build_default_robot_urdf_path() -> str:
     try:
@@ -685,3 +762,99 @@ def get_default_link_names() -> List[str]:
     # Chain: Base -> Link1 -> Link2 -> ... -> Link6
     # URDF link names
     return ["base_link", "link1", "link2", "link3", "link4", "link5", "link6"]
+
+def cost_function(q_full_t, kin : URDFKinematicsTorch):
+    w_center = 0.01
+    # 1. Joint Centering (관절이 범위 중앙에 있을수록 좋음)
+    
+    # 중앙값 계산: (Min + Max) / 2
+    limits_mid = (kin.lower + kin.upper) / 2.0  # (N,)
+    
+    # 범위 계산: Max - Min
+    limits_range = (kin.upper - kin.lower)      # (N,)
+    
+    # 0으로 나누기 방지 (무한대 리미트가 있거나 범위가 0인 경우 대비)
+    limits_range = torch.clamp(limits_range, min=1e-6)
+
+    # 정규화된 거리 제곱 계산: ((q - mid) / (range/2))^2
+    # 결과가 0이면 정중앙, 1이면 한계점(Limit)에 도달했음을 의미
+    dist_from_mid = (q_full_t - limits_mid) / (limits_range * 0.5) 
+    
+    # 모든 관절의 이탈 정도를 합산 -> (B,)
+    cost_center = torch.sum(dist_from_mid ** 2, dim=-1) 
+
+    # 최종 비용
+    total_cost = w_center * cost_center
+
+    # print(f"Joint Centering Cost: {total_cost}")
+    
+    return total_cost
+
+
+def collision_penalty(
+    pts: torch.Tensor,
+    obstacles: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
+    clearance: float,
+) -> torch.Tensor:
+    """
+    pts: (B, M, 3) points (e.g., FK link positions)
+    obstacles: list of (R, p, h) where R is 3x3 (world_from_box), p is (3,), h is (3,) half-extent
+    clearance: distance within which penalty grows linearly
+    Returns: (B,) penalty per sample (max over points/obstacles)
+    """
+    if (obstacles is None) or (len(obstacles) == 0):
+        return torch.zeros(pts.shape[0], device=pts.device, dtype=pts.dtype)
+
+    penalties = []
+    for R, p, h in obstacles:
+        # world -> box frame
+        pts_rel = pts - p
+        pts_local = torch.einsum("bkj,ij->bki", pts_rel, R.transpose(0, 1))
+        q = torch.abs(pts_local) - h  # (B, M, 3)
+
+        dist_out = torch.linalg.norm(torch.clamp(q, min=0.0), dim=-1)  # outside distance
+        max_q = torch.max(q, dim=-1).values  # inside -> negative
+        signed = torch.where(dist_out > 0, dist_out, max_q)
+        pen = torch.clamp(clearance - signed, min=0.0)  # inside or within clearance -> positive
+        penalties.append(pen)
+
+    pen_all = torch.stack(penalties, dim=0).max(dim=0).values  # (B, M)
+    return pen_all.max(dim=1).values  # (B,)
+
+def expand_target_by_pitch(
+    T_ee: np.ndarray,
+    pitch_min: float = 0.1,
+    pitch_max: float = 0.4,
+    num_pitch: int = 10,
+    return_pitches: bool = False,
+) -> np.ndarray:
+    """
+    Expand a single EE target into multiple targets by sweeping pitch
+    around the EE local Y-axis.
+    """
+    pitches = np.linspace(pitch_min, pitch_max, num_pitch)
+
+    # pitches = [0.2]
+
+    R0 = T_ee[:3, :3]
+    p0 = T_ee[:3, 3]
+
+    targets = []
+    for pitch in pitches:
+        cp, sp = math.cos(pitch), math.sin(pitch)
+        Ry = np.array([
+            [ cp, 0.0,  sp],
+            [0.0, 1.0, 0.0],
+            [-sp, 0.0,  cp],
+        ])
+
+        T = np.eye(4)
+        # EE local frame 기준 상대 pitch
+        T[:3, :3] = R0 @ Ry
+        T[:3, 3] = p0
+        targets.append(T)
+
+    stacked = np.stack(targets, axis=0)  # (num_pitch, 4, 4)
+    if return_pitches:
+        return stacked, pitches
+    return stacked

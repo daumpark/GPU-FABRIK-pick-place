@@ -438,8 +438,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -464,19 +464,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>
@@ -541,8 +541,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -567,19 +567,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>
@@ -644,8 +644,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -670,19 +670,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>
@@ -747,8 +747,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -773,19 +773,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>
@@ -850,8 +850,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -876,19 +876,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>
@@ -953,8 +953,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -979,19 +979,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>
@@ -1056,8 +1056,8 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
+                <mu>3</mu>
+                <mu2>3</mu2>
                 <fdir1>0 0 0</fdir1>
                 <slip1>0</slip1>
                 <slip2>0</slip2>
@@ -1082,19 +1082,19 @@
               <collide_bitmask>1</collide_bitmask>
               <ode>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
+                <kd>10</kd>
+                <max_vel>0.1</max_vel>
                 <min_depth>0</min_depth>
               </ode>
               <bullet>
                 <split_impulse>1</split_impulse>
                 <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
                 <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
+                <soft_erp>0.8</soft_erp>
                 <kp>1e+13</kp>
-                <kd>1</kd>
+                <kd>10</kd>
               </bullet>
             </contact>
           </surface>

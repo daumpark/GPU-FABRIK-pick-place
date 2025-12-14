@@ -184,7 +184,8 @@ void GazeboLinkAttacherPrivate::Attach(
     joint->SetUpperLimit(0, 0);
     joint->SetLowerLimit(0, 0);
     joint->SetEffortLimit(0, 0);
-    joint->SetDamping(1, 1.0);
+    // The created joint is 1-DOF; damping index must be 0.
+    joint->SetDamping(0, 1.0);
 
     joint->Init();
     model1->Update();

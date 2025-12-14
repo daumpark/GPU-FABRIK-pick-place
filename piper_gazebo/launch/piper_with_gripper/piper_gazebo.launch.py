@@ -70,12 +70,6 @@ def generate_launch_description():
              'gripper_controller'],
         output='screen'
         )
-    
-    load_gripper8_trajectory_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 
-             'gripper8_controller'],
-        output='screen'
-        )
 
     close_evt1 =  RegisterEventHandler( 
             event_handler=OnProcessExit(
@@ -88,22 +82,14 @@ def generate_launch_description():
             event_handler=OnProcessExit(
                 target_action=load_joint_state_controller,
                 on_exit=[load_joint_trajectory_controller, 
-                         load_gripper_trajectory_controller,
-                         load_gripper8_trajectory_controller],
+                         load_gripper_trajectory_controller],
             )
-    )
-
-    node_gripper_mirror_controller = Node(
-        package='piper_gazebo',
-        executable='joint8_ctrl.py',
-        output='screen'
     )
 
     ld = LaunchDescription()
 
     ld.add_action(close_evt1)
     ld.add_action(close_evt2)
-    ld.add_action(node_gripper_mirror_controller)
     ld.add_action(start_gazebo_cmd)
     ld.add_action(node_robot_state_publisher)
     ld.add_action(spawn_entity_cmd)
